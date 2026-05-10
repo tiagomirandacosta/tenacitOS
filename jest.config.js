@@ -1,15 +1,15 @@
-import type { Config } from 'jest'
-import nextJest from 'next/jest.js'
+const nextJest = require('next/jest')
 
 const createJestConfig = nextJest({ dir: './' })
 
-const config: Config = {
+/** @type {import('jest').Config} */
+const config = {
   coverageProvider: 'v8',
   testEnvironment: 'node',
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
+    '^@/(.*)$': '<rootDir>/src/',
   },
   testMatch: ['**/__tests__/**/*.test.ts', '**/__tests__/**/*.test.tsx'],
 }
 
-export default createJestConfig(config)
+module.exports = createJestConfig(config)
