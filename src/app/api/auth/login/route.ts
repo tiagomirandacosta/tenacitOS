@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import bcrypt from "bcryptjs";
 
 // Simple in-memory rate limiter (per-IP, resets on server restart)
 // Sufficient for a personal dashboard — no external dependency needed
@@ -87,7 +88,9 @@ export async function POST(request: NextRequest) {
 
   const { password } = await request.json();
 
-  if (password === process.env.ADMIN_PASSWORD) {
+  const hash = process.env.ADMIN_PASSWORD_HASH || "";
+  const valid = hash ? await bcrypt.compare(password, hash) : false;
+  if (valid) {
     clearAttempts(ip); // Reset on success
 
     const response = NextResponse.json({ success: true });
