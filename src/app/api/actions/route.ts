@@ -1,7 +1,7 @@
 /**
  * Quick Actions API
  * POST /api/actions  body: { action }
- * Available actions: git-status, restart-gateway, clear-temp, usage-stats, heartbeat
+ * Available actions: git-status, restart-gateway, clear-temp, usage-stats
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { exec } from 'child_process';
@@ -48,13 +48,8 @@ async function runAction(action: string): Promise<ActionResult> {
       }
 
       case 'restart-gateway': {
-        const { stdout, stderr } = await execAsync('systemctl restart openclaw-gateway 2>&1 || echo "Service not found"');
-        output = stdout || stderr || 'Restart command executed';
-        // Also check status
-        try {
-          const { stdout: status } = await execAsync('systemctl is-active openclaw-gateway 2>&1 || echo "unknown"');
-          output += `\nStatus: ${status.trim()}`;
-        } catch {}
+        const { stdout, stderr } = await execAsync(`docker restart ${process.env.DOCKER_CONTAINER || 'moltbot-clawdbot-1'} 2>&1`);
+        output = stdout || stderr || 'Container restarted';
         break;
       }
 
@@ -76,42 +71,6 @@ async function runAction(action: string): Promise<ActionResult> {
         const { stdout: cpu } = await execAsync("top -bn1 | grep 'Cpu(s)' | head -1");
         const { stdout: uptime } = await execAsync('uptime -p');
         output = `Workspace: ${du.trim()}\n\nDisk: ${df.trim()}\n\nMemory:\n${mem.trim()}\n\nCPU: ${cpu.trim()}\n\nUptime: ${uptime.trim()}`;
-        break;
-      }
-
-      case 'heartbeat': {
-        // Check all critical services
-        const services = ['mission-control'];
-        const pm2services = ['classvault', 'content-vault', 'brain'];
-        const results: string[] = [];
-
-        for (const svc of services) {
-          const { stdout } = await execAsync(`systemctl is-active ${svc} 2>/dev/null || echo "inactive"`);
-          const status = stdout.trim();
-          results.push(`${status === 'active' ? '✅' : '❌'} ${svc}: ${status}`);
-        }
-
-        try {
-          const { stdout: pm2 } = await execAsync('pm2 jlist 2>/dev/null');
-          const pm2list = JSON.parse(pm2);
-          for (const svc of pm2services) {
-            const proc = pm2list.find((p: { name: string }) => p.name === svc);
-            const status = proc?.pm2_env?.status || 'not found';
-            results.push(`${status === 'online' ? '✅' : '❌'} ${svc} (pm2): ${status}`);
-          }
-        } catch {
-          results.push('⚠️ PM2: could not connect');
-        }
-
-        // Ping the main site
-        try {
-          const { stdout: ping } = await execAsync('curl -s -o /dev/null -w "%{http_code}" --max-time 5 https://tenacitas.cazaustre.dev');
-          results.push(`\n🌐 tenacitas.cazaustre.dev: HTTP ${ping.trim()}`);
-        } catch {
-          results.push('\n🌐 tenacitas.cazaustre.dev: unreachable');
-        }
-
-        output = results.join('\n');
         break;
       }
 
@@ -146,7 +105,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing action' }, { status: 400 });
     }
 
-    const validActions = ['git-status', 'restart-gateway', 'clear-temp', 'usage-stats', 'heartbeat', 'npm-audit'];
+    const validActions = ['git-status', 'restart-gateway', 'clear-temp', 'usage-stats', 'npm-audit'];
     if (!validActions.includes(action)) {
       return NextResponse.json({ error: `Unknown action. Valid: ${validActions.join(', ')}` }, { status: 400 });
     }
